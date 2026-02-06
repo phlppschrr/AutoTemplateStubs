@@ -112,7 +112,8 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 						$fieldClassName = ucfirst($this->wire()->sanitizer->camelCase($field->name)) . 'Page';
 						$className = "RepeaterMatrix{$fieldClassName}_" . ucfirst($this->wire()->sanitizer->camelCase($typeName));
 					} else {
-						$className = "{$this->class_prefix}repeater_matrix_{$field->name}_{$typeName}";
+						$typeSlug = str_replace('-', '_', $typeName);
+						$className = "{$this->class_prefix}repeater_matrix_{$field->name}_{$typeSlug}";
 					}
 					$types[] = $className . '[]';
 				}
@@ -545,6 +546,7 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 		if((string) $field->type === 'FieldtypeRepeaterMatrix') {
 			// Match default naming
 			$p1 = $stubs_path . $this->class_prefix . "repeater_matrix_{$field->name}_*.php";
+			$p1 = str_replace('-', '_', $p1);
 			// Match custom page class naming
 			$camelField = ucfirst($this->wire()->sanitizer->camelCase($field->name));
 			$p2 = $stubs_path . "RepeaterMatrix{$camelField}Page_*.php";
@@ -789,7 +791,8 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 			$fieldClassName = ucfirst($this->wire()->sanitizer->camelCase($field->name)) . 'Page';
 			$className = "RepeaterMatrix{$fieldClassName}_" . ucfirst($this->wire()->sanitizer->camelCase($typeName));
 		} else {
-			$className = "{$this->class_prefix}repeater_matrix_{$field->name}_{$typeName}";
+			$typeSlug = str_replace('-', '_', $typeName);
+			$className = "{$this->class_prefix}repeater_matrix_{$field->name}_{$typeSlug}";
 		}
 		
 		$properties = array();
