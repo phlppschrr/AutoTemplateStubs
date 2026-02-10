@@ -363,6 +363,8 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 			'InputfieldCheckboxes' => 'array',
 			'InputfieldAsmSelect' => 'array',
 			'InputfieldPageListSelectMultiple' => 'array',
+			'InputfieldText' => 'string',
+			'InputfieldTextarea' => 'string',
 			'InputfieldTextTags' => 'string',
 			'InputfieldRadios' => 'string',
 			'InputfieldToggle' => 'int',
@@ -676,7 +678,7 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 				}
 			}
 			
-			if($type === null) continue;
+			if($type === null) $type = 'mixed';
 			$type = $type ?: 'string';
 			$properties[] = " * @property $type \$$name {$f->label}";
 		}
