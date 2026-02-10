@@ -434,7 +434,10 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 		if($fieldType === 'FieldtypeCombo') $this->generateComboStub($field);
 		if($fieldType === 'FieldtypeTable') $this->generateTableStubs($field);
 		if($fieldType === 'FieldtypeTextareas') $this->generateTextareasStub($field);
-		if($fieldType === 'FieldtypeRepeaterMatrix') $this->generateMatrixStub($field);
+		if($fieldType === 'FieldtypeRepeaterMatrix') {
+			$this->deleteFieldStub($field);
+			$this->generateMatrixStub($field);
+		}
 		if($fieldType === 'FieldtypeCustom') $this->generateCustomFieldStub($field);
 		
 		foreach($templates as $template) {
