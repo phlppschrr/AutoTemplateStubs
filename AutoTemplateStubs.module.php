@@ -31,6 +31,7 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 		$this->custom_page_class_compatible = 0;
 		$this->class_prefix = 'tpl_';
 		$this->stubs_path_relative = '/site/templates/';
+		$this->inject_custom_page_class_phpdoc = 0;
 	}
 
 	/**
@@ -61,8 +62,8 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 			'FieldtypeEmail' => 'string',
 			'FieldtypeFieldsetPage' => function (Field $field) {
 				if($this->custom_page_class_compatible) {
-					$class_name = ucfirst($this->wire()->sanitizer->camelCase($field->name)) . 'Page';
-					return "FieldsetPage|Repeater{$class_name}";
+					$class_name = $this->wire()->sanitizer->pascalCase($field->name) . 'FieldsetPage';
+					return "FieldsetPage|{$class_name}";
 				} else {
 					return "FieldsetPage|{$this->class_prefix}repeater_{$field->name}";
 				}
@@ -96,8 +97,8 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 			'FieldtypePassword' => 'Password',
 			'FieldtypeRepeater' => function (Field $field) {
 				if($this->custom_page_class_compatible) {
-					$class_name = ucfirst($this->wire()->sanitizer->camelCase($field->name)) . 'Page';
-					return "RepeaterPageArray|Repeater{$class_name}[]";
+					$class_name = $this->wire()->sanitizer->pascalCase($field->name) . 'RepeaterPage';
+					return "RepeaterPageArray|{$class_name}[]";
 				} else {
 					return "RepeaterPageArray|{$this->class_prefix}repeater_{$field->name}[]";
 				}
@@ -109,8 +110,8 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 				
 				foreach($matrixTypes as $typeName => $typeInfo) {
 					if($this->custom_page_class_compatible) {
-						$fieldClassName = ucfirst($this->wire()->sanitizer->camelCase($field->name)) . 'Page';
-						$className = "RepeaterMatrix{$fieldClassName}_" . ucfirst($this->wire()->sanitizer->camelCase($typeName));
+						$fieldClassName = $this->wire()->sanitizer->pascalCase($field->name) . 'RepeaterMatrixPage';
+						$className = "{$fieldClassName}_" . $this->wire()->sanitizer->pascalCase($typeName);
 					} else {
 						$typeSlug = str_replace('-', '_', $typeName);
 						$className = "{$this->class_prefix}repeater_matrix_{$field->name}_{$typeSlug}";
@@ -227,7 +228,7 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 	 * @return string
 	 */
 	protected function getTableRowsClassName(Field $field) {
-		return ucfirst($field->name) . 'TableRows';
+		return $this->wire()->sanitizer->pascalCase($field->name) . 'TableRows';
 	}
 
 	/**
@@ -237,7 +238,7 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 	 * @return string
 	 */
 	protected function getTableRowClassName(Field $field) {
-		return ucfirst($field->name) . 'TableRow';
+		return $this->wire()->sanitizer->pascalCase($field->name) . 'TableRow';
 	}
 
 	/**
@@ -499,6 +500,11 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 			$this->stubs_path_relative = $data['stubs_path_relative'];
 			$regenerate_stubs = true;
 		}
+		// Inject custom Page class PHPDoc toggle changed
+		if($data['inject_custom_page_class_phpdoc'] !== $this->inject_custom_page_class_phpdoc) {
+			$this->inject_custom_page_class_phpdoc = $data['inject_custom_page_class_phpdoc'];
+			$regenerate_stubs = true;
+		}
 		// Regenerate template stubs checkbox checked
 		if(!empty($data['regenerate_stubs'])) {
 			$regenerate_stubs = true;
@@ -553,8 +559,8 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 			$p1 = $stubs_path . $this->class_prefix . "repeater_matrix_{$field->name}_*.php";
 			$p1 = str_replace('-', '_', $p1);
 			// Match custom page class naming
-			$camelField = ucfirst($this->wire()->sanitizer->camelCase($field->name));
-			$p2 = $stubs_path . "RepeaterMatrix{$camelField}Page_*.php";
+			$fieldPascalName = $this->wire()->sanitizer->pascalCase($field->name);
+			$p2 = $stubs_path . "{$fieldPascalName}RepeaterMatrixPage_*.php";
 			
 			foreach(glob($p1) as $f) $files[] = $f;
 			foreach(glob($p2) as $f) $files[] = $f;
@@ -588,10 +594,10 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 	 * @param Template $template
 	 */
 	protected function generateTemplateStub(Template $template) {
-		$class_name = $this->getTemplateClassName($template->name);
-		
-		// Determine parent class
 		$extends = 'Page';
+		if($template->name === 'user') {
+			$extends = 'User';
+		}
 		if(strpos($template->name, 'repeater_') === 0) {
 			$fieldName = substr($template->name, 9);
 			$field = $this->wire()->fields->get($fieldName);
@@ -602,20 +608,31 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 					$extends = 'RepeaterPage';
 				}
 			}
+		} else if(strpos($template->name, 'fieldset_') === 0) {
+			$extends = 'FieldsetPage';
 		}
+		$class_name = $this->getTemplateClassName($template->name, $extends);
 
 		$contents = "<?php namespace ProcessWire;\n\n";
 		$template_name = $template->name;
 		if($template->label) $template_name .= " ($template->label)";
-		$contents .= "/**\n * Template: $template_name\n *";
+		$contents .= "/**\n * Template: $template_name\n";
+		$properties = array();
+		$inject_phpdoc = $this->custom_page_class_compatible && $this->inject_custom_page_class_phpdoc;
+		$vars = $inject_phpdoc ? array() : null;
 		foreach($template->fields as $field) {
 			if(in_array((string) $field->type, $this->skip_fieldtypes)) continue;
 			if($field->name === 'repeater_matrix_type') continue;
 			$field_info = $this->getFieldInfo($field, $template);
-			$contents .= "\n * @property {$field_info['returns']} \${$field->name} {$field_info['label']}";
+			$properties[] = " * @property {$field_info['returns']} \${$field->name} {$field_info['label']}";
+			if($inject_phpdoc) $vars[] = "/** @var {$field_info['returns']} \${$field->name} {$field_info['label']} */";
 		}
-		$contents .= "\n */\nclass $class_name extends $extends {}\n";
-		$this->writeStubFile($class_name, $contents);
+		if($properties) $contents .= implode("\n", $properties) . "\n";
+		$contents .= " */\nclass $class_name extends $extends {}\n";
+		if(!$this->inject_custom_page_class_phpdoc) {
+			$this->writeStubFile($class_name, $contents);
+		}
+		if($inject_phpdoc) $this->injectCustomPageClassDoc($template, $vars, $class_name, $extends);
 	}
 
 	/**
@@ -793,8 +810,8 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 	 */
 	protected function generateMatrixTypeStub(Field $field, $typeName, array $typeInfo) {
 		if($this->custom_page_class_compatible) {
-			$fieldClassName = ucfirst($this->wire()->sanitizer->camelCase($field->name)) . 'Page';
-			$className = "RepeaterMatrix{$fieldClassName}_" . ucfirst($this->wire()->sanitizer->camelCase($typeName));
+			$fieldClassName = $this->wire()->sanitizer->pascalCase($field->name) . 'RepeaterMatrixPage';
+			$className = "{$fieldClassName}_" . $this->wire()->sanitizer->pascalCase($typeName);
 		} else {
 			$typeSlug = str_replace('-', '_', $typeName);
 			$className = "{$this->class_prefix}repeater_matrix_{$field->name}_{$typeSlug}";
@@ -865,12 +882,76 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 	 * @param string $templateName
 	 * @return string
 	 */
-	protected function getTemplateClassName($templateName) {
+	protected function getTemplateClassName($templateName, $extends = null) {
 		if($this->custom_page_class_compatible) {
-			return ucfirst($this->wire()->sanitizer->camelCase($templateName)) . 'Page';
-		} else {
-			return $this->class_prefix . str_replace('-',  '_', $templateName);
+				if($extends === null) {
+					$extends = 'Page';
+					if($templateName === 'user') {
+						$extends = 'User';
+					}
+					if(strpos($templateName, 'repeater_') === 0) {
+						$fieldName = substr($templateName, 9);
+						$field = $this->wire()->fields->get($fieldName);
+						if($field) {
+						if($field->type instanceof FieldtypeRepeaterMatrix) {
+							$extends = 'RepeaterMatrixPage';
+						} elseif($field->type instanceof FieldtypeRepeater) {
+							$extends = 'RepeaterPage';
+						}
+					}
+				} else if(strpos($templateName, 'fieldset_') === 0) {
+					$extends = 'FieldsetPage';
+				}
+			}
+
+			$baseName = $templateName;
+			if($extends === 'RepeaterPage' || $extends === 'RepeaterMatrixPage') {
+				if(strpos($templateName, 'repeater_') === 0) $baseName = substr($templateName, 9);
+			} else if($extends === 'FieldsetPage' && strpos($templateName, 'fieldset_') === 0) {
+				$baseName = substr($templateName, 9);
+			}
+
+			$pascal = $this->wire()->sanitizer->pascalCase($baseName);
+			if($extends === 'RepeaterPage') return $pascal . 'RepeaterPage';
+			if($extends === 'RepeaterMatrixPage') return $pascal . 'RepeaterMatrixPage';
+			if($extends === 'FieldsetPage') return $pascal . 'FieldsetPage';
+			return $pascal . 'Page';
 		}
+		return $this->class_prefix . str_replace('-',  '_', $templateName);
+	}
+
+	/**
+	 * Inject AutoTemplateStubs properties into native custom Page class
+	 *
+	 * @param Template $template
+	 * @param array $properties
+	 */
+	protected function injectCustomPageClassDoc(Template $template, array $vars, $className, $extends) {
+		if(!$this->custom_page_class_compatible) return;
+		if(!$this->inject_custom_page_class_phpdoc) return;
+		if(empty($vars)) return;
+		$classesPath = $this->wire()->config->paths->classes;
+		if(!is_dir($classesPath)) $this->wire()->files->mkdir($classesPath, true);
+		$filePath = $classesPath . "$className.php";
+		if(!is_file($filePath)) {
+			$region = "//region AutoTemplateStubs\n//endregion";
+			$contents = "<?php namespace ProcessWire;\n\n";
+			$contents .= "$region\n";
+			$contents .= "class $className extends $extends {\n";
+			$contents .= "}\n";
+			$this->wire()->files->filePutContents($filePath, $contents);
+		}
+		if(!is_file($filePath) || !is_writable($filePath)) return;
+		$contents = file_get_contents($filePath);
+		if($contents === false) return;
+		$regionPattern = '/\/\/region AutoTemplateStubs\s*.*?\s*\/\/endregion/s';
+		if(!preg_match($regionPattern, $contents)) return;
+		$regionLines = array('//region AutoTemplateStubs');
+		foreach($vars as $line) $regionLines[] = $line;
+		$regionLines[] = '//endregion';
+		$region = implode("\n", $regionLines);
+		$contents = preg_replace($regionPattern, $region, $contents, 1);
+		$this->wire()->files->filePutContents($filePath, $contents);
 	}
 
 	/**
@@ -965,6 +1046,20 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 		$f->label = sprintf($this->_('Name stub classes for compatibility with [custom Page classes](%s)'), 'https://processwire.com/blog/posts/pw-3.0.152/#new-ability-to-specify-custom-page-classes');
 		$f->notes = $this->_('If checked stub classes will be named according to the camel case "[TemplateName]Page" format used for custom page classes, e.g. BlogPostPage');
 		$f->checked = $this->$f_name === 1 ? 'checked' : '';
+		$inputfields->add($f);
+
+		/** @var InputfieldCheckbox $f */
+		$f = $modules->get('InputfieldCheckbox');
+		$f_name = 'inject_custom_page_class_phpdoc';
+		$f->name = $f_name;
+		$f->label = $this->_('Inject PHPDoc into custom Page classes');
+		$f->description = $this->_('When enabled, AutoTemplateStubs updates files in /site/classes by replacing the region "AutoTemplateStubs". **Warning: This edits your existing class files.**');
+		$f->notes = $this->_('Only the region block is modified. For existing classes, you must add the region marker manually. If a class does not exist yet, an empty class file with the region marker will be created.  
+		```//region AutoTemplateStubs
+		//endregion```');
+
+		$f->checked = $this->$f_name === 1 ? 'checked' : '';
+		$f->showIf = 'custom_page_class_compatible=1';
 		$inputfields->add($f);
 
 		/** @var InputfieldText $f */
