@@ -625,7 +625,7 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 			if($field->name === 'repeater_matrix_type') continue;
 			$field_info = $this->getFieldInfo($field, $template);
 			$properties[] = " * @property {$field_info['returns']} \${$field->name} {$field_info['label']}";
-			if($inject_phpdoc) $vars[] = "/** @var {$field_info['returns']} \${$field->name} {$field_info['label']} */";
+			if($inject_phpdoc) $vars[] = " * @property {$field_info['returns']} \${$field->name} {$field_info['label']}";
 		}
 		if($properties) $contents .= implode("\n", $properties) . "\n";
 		$contents .= " */\nclass $class_name extends $extends {}\n";
@@ -947,7 +947,9 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 		$regionPattern = '/\/\/region AutoTemplateStubs\s*.*?\s*\/\/endregion/s';
 		if(!preg_match($regionPattern, $contents)) return;
 		$regionLines = array('//region AutoTemplateStubs');
+		$regionLines[] = '/**';
 		foreach($vars as $line) $regionLines[] = $line;
+		$regionLines[] = ' */';
 		$regionLines[] = '//endregion';
 		$region = implode("\n", $regionLines);
 		$contents = preg_replace($regionPattern, $region, $contents, 1);
