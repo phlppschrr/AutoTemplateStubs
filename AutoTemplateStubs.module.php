@@ -594,7 +594,9 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 	 * @param Template $template
 	 */
 	protected function generateTemplateStub(Template $template) {
-		$extends = 'Page';
+		$defaultPageExists = $this->custom_page_class_compatible
+			&& file_exists($this->wire()->config->paths->classes . 'DefaultPage.php');
+		$extends = $defaultPageExists ? 'DefaultPage' : 'Page';
 		if($template->name === 'user') {
 			$extends = 'User';
 		}
@@ -792,6 +794,7 @@ class AutoTemplateStubs extends WireData implements Module, ConfigurableModule {
 	 */
 	protected function generateMatrixStub(Field $field) {
 		if((string) $field->type !== 'FieldtypeRepeaterMatrix') return;
+		if(!method_exists($field, 'getMatrixTypesInfo')) return; // Field not yet a RepeaterMatrixField (e.g. during creation)
 		
 		$matrixTypes = $field->getMatrixTypesInfo();
 		if(empty($matrixTypes)) return;
